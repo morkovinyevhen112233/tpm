@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ''
+Parameters:
+ DomainName:
+    Default: 'exemples.com'
+    Type: String
+    Description: >
+      The DNS name of an existing Amazon Route 53 hosted zone
+ BucketName:
+    Type: String
+     Description: >
+      Amazon S3 files bucket name
+ certificateArn:
+    Type: String
+    Description: >
+      Certificate Link
+ HostedZone:
+    Type: String
+    Description: >
+      Amazon Route53 Hosted Zone Id for DomainName   
+Resources:
+  myDNSRecord2:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: DomainName
+      Name: DomainName
+      Type: A
+      TTL: '900'
+      ResourceRecords:
+       - 192.168.0.1
+       - 192.168.0.2
+  SampleBucketPolicy:
+    Type: AWS::S3::Bucket
+    Properties:
+      PolicyDocument:
+        Statement:
+          Sid: 1
+          Effect: Allow
+          Principal: 
+            AWS:
+              arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity *********
+          Action: s3:GetObject
+  HostedZone:
+    Type: 'AWS::Route53::HostedZone'
+    Properties:
+      HostedZoneConfig:
+        Comment: !Sub "${Name} private DNS zone"
+      Name: !Ref Name
+      VPCs:
+      - VPCId: {'Fn::ImportValue': !Sub '${ParentVPCStack}-VPC'}
+        VPCRegion: !Ref 'AWS::Region'
+  DNS:
+    Type: "AWS::Route53::HostedZone"
+    Properties:
+      Name: !Ref DomainName
+      HostedZoneConfig:
+	    Comment: !Join
+	     - " "
+	     - ["My hosted zone for", !Ref DomainName]
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: DOC-EXAMPLE-BUCKET
+      
+  ConfigRule:
+    Type: "AWS::Config::ConfigRule"
+    Properties:
+      ConfigRuleName: "s3-bucket-public-read-prohibited"
+      Scope:
+        ComplianceResourceTypes:
+          - "AWS::S3::Bucket"
+      Source:
+        Owner: "AWS"
+        SourceIdentifier: "S3_BUCKET_PUBLIC_READ_PROHIBITED"
+  myDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          DomainName: DomainName
+          CustomOriginConfig: 
+            HTTPSPort: '443'
+            OriginProtocolPolicy: https-only
+        enabled: 'true'  
+Outputs:
+  myDistribution:
+    Type: AWS::CloudFront::ID
